@@ -68,6 +68,7 @@ set(SRC_LIST fpga-miner.c
 		./algo/sponge.c
 		./algo/lyra2.c
 		./algo/lyra2re.c
+		./algo/lyra2z.c
 		./algo/nist5.c
 	)
 			

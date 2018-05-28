@@ -493,6 +493,9 @@ int scanhash_keccak512(int thr_id, uint32_t *pdata, const uint32_t *ptarget, uin
 void lyra2rev2_hash(void *output, const void *input);
 int scanhash_lyra2rev2(int thr_id, uint32_t *pdata, const uint32_t *ptarget, uint32_t max_nonce, uint64_t *hashes_done);
 
+void lyra2z_hash(void *output, const void *input);
+int scanhash_lyra2z(int thr_id, uint32_t *pdata, const uint32_t *ptarget, uint32_t max_nonce, uint64_t *hashes_done);
+
 void nist5_hash(void *output, const void *input);
 int scanhash_nist5(int thr_id, uint32_t *pdata, const uint32_t *ptarget, uint32_t max_nonce, uint64_t *hashes_done);
 

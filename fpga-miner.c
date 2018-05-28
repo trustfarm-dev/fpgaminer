@@ -212,6 +212,7 @@ enum algos {
 	ALGO_KECCAK256,	  // KECCAK256
 	ALGO_KECCAK512,   // Keccak512
 	ALGO_LYRA2REV2,   // Lyra2REv2
+	ALGO_LYRA2Z,      // Lyra2Z
 	ALGO_NIST5,       // NIST5
 	ALGO_COUNT
 };
@@ -226,6 +227,7 @@ static const char *algo_names[] = {
 	"keccak256",
 	"keccak512",
 	"lyra2rev2",
+	"lyra2z",
 	"nist5",
 	"\0"
 };
@@ -346,6 +348,7 @@ Options:\n\
                                keccak256    Keccak256\n\
                                keccak512    Keccak512\n\
                                lyra2rev2    Lyra2REv2\n\
+                               lyra2z       Lyra2Z\n\
                                myr-gr       Myriad-Groestl\n\
                                nist5        NIST5\n\
                                vcash        Blake256 - 8 Rounds\n\
@@ -1752,6 +1755,9 @@ static void *miner_thread(void *userdata)
 		case ALGO_LYRA2REV2:
 			rc = scanhash_lyra2rev2(thr_id, work.data, work.target, max_nonce, &hashes_done);
 			break;
+		case ALGO_LYRA2Z:
+			rc = scanhash_lyra2z(thr_id, work.data, work.target, max_nonce, &hashes_done);
+			break;
 		case ALGO_NIST5:
 			rc = scanhash_nist5(thr_id, work.data, work.target, max_nonce, &hashes_done);
 			break;
@@ -2641,6 +2647,9 @@ static bool detect_fpga()
 			case ALGO_LYRA2REV2:
 				bitstream = "ztex_lyra2rev2.bit";
 				break;
+			case ALGO_LYRA2Z:
+				bitstream = "ztex_lyra2z.bit";
+				break;
 			case ALGO_NIST5:
 				bitstream = "ztex_nist5.bit";
 				break;
@@ -2767,6 +2776,9 @@ extern void calc_hash(unsigned char *data, const unsigned char *hash)
 			break;
 		case ALGO_LYRA2REV2:
 			lyra2rev2_hash((void *)hash, (void *)endian_data);
+			break;
+		case ALGO_LYRA2Z:
+			lyra2z_hash((void *)hash, (void *)endian_data);
 			break;
 		case ALGO_NIST5:
 			nist5_hash((void *)hash, (void *)endian_data);
