@@ -5,8 +5,6 @@
 #include "../miner.h"
 #include "sph_blake.h"
 
-#define BLAKE32_ROUNDS 8
-
 extern void blake256_8_midstate(unsigned char *midstate, unsigned char *data);
 extern void blake256_8_hash(unsigned char *hash, unsigned char *data);
 extern int scanhash_blakecoin(int thr_id, uint32_t *pdata, const uint32_t *ptarget, uint32_t max_nonce, uint64_t *hashes_done);
@@ -17,6 +15,7 @@ void blake256_8_midstate(unsigned char *midstate, unsigned char *data)
 	uint32_t* m = (uint32_t*)midstate;
 	sph_blake256_context ctx;
 	
+	sph_blake256_set_rounds(8);
 	sph_blake256_init(&ctx);
 	sph_blake256(&ctx, data, 80);
 	
@@ -28,6 +27,7 @@ void blake256_8_hash(unsigned char *hash, unsigned char *data)
 	sph_blake256_context ctx;
 	unsigned char h[64];
 	
+	sph_blake256_set_rounds(8);
 	sph_blake256_init(&ctx);
 	sph_blake256(&ctx, data, 80);
 	sph_blake256_close(&ctx, h);
@@ -52,6 +52,7 @@ int scanhash_blake256_8(int thr_id, uint32_t *pdata, const uint32_t *ptarget, ui
 	// Change Endianess On Each 4 Byte Chunk
 	swap_endian(endiandata, pdata, 80);
 	
+	sph_blake256_set_rounds(8);
 	sph_blake256_init(&ctx);
 	sph_blake256(&ctx, endiandata, 80);
 	
