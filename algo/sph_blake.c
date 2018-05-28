@@ -36,6 +36,8 @@
 
 #include "sph_blake.h"
 
+int blake256_rounds = 14;
+
 #ifdef __cplusplus
 extern "C"{
 #endif
@@ -509,10 +511,6 @@ static const sph_u64 CB[16] = {
 		(state)->T1 = T1; \
 	} while (0)
 
-#define BLAKE32_ROUNDS 8
-//#ifndef BLAKE32_ROUNDS
-//#define BLAKE32_ROUNDS 14
-//#endif
 
 #if SPH_COMPACT_BLAKE_32
 
@@ -553,7 +551,7 @@ static const sph_u64 CB[16] = {
 		M[0xD] = sph_dec32be_aligned(buf + 52); \
 		M[0xE] = sph_dec32be_aligned(buf + 56); \
 		M[0xF] = sph_dec32be_aligned(buf + 60); \
-		for (r = 0; r < BLAKE32_ROUNDS; r ++) \
+		for (r = 0; r < blake256_rounds; r ++) \
 			ROUND_S(r); \
 		H0 ^= S0 ^ V0 ^ V8; \
 		H1 ^= S1 ^ V1 ^ V9; \
@@ -612,7 +610,7 @@ static const sph_u64 CB[16] = {
 		ROUND_S(5); \
 		ROUND_S(6); \
 		ROUND_S(7); \
-		if (BLAKE32_ROUNDS == 14) { \
+		if (blake256_rounds == 14) { \
 		ROUND_S(8); \
 		ROUND_S(9); \
 		ROUND_S(0); \
@@ -1058,6 +1056,13 @@ sph_blake256_addbits_and_close(void *cc, unsigned ub, unsigned n, void *dst)
 {
 	blake32_close(cc, ub, n, dst, 8);
 	sph_blake256_init(cc);
+}
+
+/* see sph_blake.h */
+void
+sph_blake256_set_rounds(int rounds)
+{
+	blake256_rounds = rounds;
 }
 
 #if SPH_64
