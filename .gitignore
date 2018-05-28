@@ -1,0 +1,7 @@
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+/fpga_miner
+*.a
+*.o

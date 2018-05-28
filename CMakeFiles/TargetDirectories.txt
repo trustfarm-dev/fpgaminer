@@ -1,2 +1,0 @@
-/root/fpgaminer-aws/CMakeFiles/fpga_miner.dir
-/root/fpgaminer-aws/compat/jansson/CMakeFiles/jansson.dir
