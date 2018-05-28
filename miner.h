@@ -207,6 +207,8 @@ struct fpga_info {
 	char * device_path;
 	int device_fd;
 	int slot_id;
+	int pf_id;
+	int bar_id;
 	int timeout;
 	double Hs;		// Estimated Seconds Per Hash For Serial FPGAs Only
 	double hashrate;

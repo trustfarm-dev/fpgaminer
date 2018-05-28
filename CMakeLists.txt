@@ -79,7 +79,7 @@ ELSE ( WIN32 )
 	add_executable(${TARGET_NAME} ${SRC_LIST})
 ENDIF ( WIN32 )
 
-target_link_libraries(${TARGET_NAME} crypto pthread ${CURL_LIBRARIES} ${LIBUSB_LIBRARIES} jansson)
+target_link_libraries(${TARGET_NAME} crypto pthread ${CURL_LIBRARIES} ${LIBUSB_LIBRARIES} jansson fpga_mgmt)
 
 IF(WIN32)
 	target_link_libraries(${TARGET_NAME} Ws2_32)

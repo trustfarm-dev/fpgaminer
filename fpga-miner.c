@@ -18,10 +18,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <sys/time.h>
-#include <sys/mman.h>
-#include <dirent.h>
 #include <time.h>
 #include <signal.h>
 
@@ -60,12 +57,135 @@
 
 #include <stdint.h>
 
+#include <fpga_pci.h>
+#include <fpga_mgmt.h>
+#include <utils/lcd.h>
 
-static uint16_t pci_vendor_id = 0x10EE;
-static uint16_t pci_device_id = 0x9011;
-static char pci_path[64] = "/sys/bus/pci/devices/xxxxxxxxxxxx/resource0";
-static int pci_fd;
-static volatile uint32_t* pci_base;
+
+static uint16_t pci_vendor_id = 0x1D0F;
+static uint16_t pci_device_id = 0xF000;
+int pci_test(int slot, int pf_id, int bar_id);
+int check_afi_ready(int slot);
+
+
+int pci_test(int slot_id, int pf_id, int bar_id) {
+	int i, rc;
+	uint32_t value = 0x00000000;
+	uint64_t addr = 0x500;
+	pci_bar_handle_t pci_bar_handle = PCI_BAR_HANDLE_INIT;
+
+	// attach to the fpga, with a pci_bar_handle out param
+	// To attach to multiple slots or BARs, call this function multiple times,
+	// saving the pci_bar_handle to specify which address space to interact with in
+	// other API calls.
+	// This function accepts the slot_id, physical function, and bar number
+	rc = fpga_pci_attach(slot_id, pf_id, bar_id, 0, &pci_bar_handle);
+
+	// Send empty value to address 0x500 to trigger FPGA to send back a result...this is just a dummy test to show connectivity
+	printf("Running connectivity test\n");
+	rc = fpga_pci_poke(pci_bar_handle, addr, value);
+
+	// Display value returned from FPGA
+	rc = fpga_pci_peek(pci_bar_handle, addr, &value);
+	printf("FPGA returned 0x%x from address 0x%x\n", value, addr);
+
+	// Create dummy Block Header data
+	unsigned char b[] = { 0x02, 0x04, 0x00, 0x00, 0x13, 0xd7, 0xa7, 0x79, 0x94, 0x5e, 0xf7, 0x76, 0xe2, 0x5a, 0x7a, 0xec, 0xf8, 0xcc, 0x45, 0xe9, 0x7b, 0xac, 0xb8, 0x01, 0xeb, 0xb3, 0x90, 0x54, 0x5a, 0x42, 0xee, 0x32, 0xd0, 0x64, 0xd9, 0x5b, 0xcf, 0x21, 0x57, 0xa3, 0xe0, 0x19, 0x12, 0xbe, 0xa9, 0xc7, 0x35, 0x65, 0xf7, 0x45, 0x09, 0xde, 0xfd, 0x41, 0x92, 0x4e, 0x6d, 0xd7, 0xf2, 0x3b, 0xa7, 0x7d, 0xa9, 0x6c, 0xa6, 0xc8, 0x42, 0x5b, 0x06, 0xb1, 0x53, 0x53, 0x1e, 0xc1, 0x00, 0x1c, 0xFF, 0x00, 0x00, 0x00 };
+	printf("Block Header: %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n", b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7],b[8],b[9],b[10],b[11],b[12],b[13],b[14],b[15],b[16],b[17],b[18],b[19],b[20],b[21],b[22],b[23],b[24],b[25],b[26],b[27],b[28],b[29],b[30],b[31],b[32],b[33],b[34],b[35],b[36],b[37],b[38],b[39],b[40],b[41],b[42],b[43],b[44],b[45],b[46],b[47],b[48],b[49],b[50],b[51],b[52],b[53],b[54],b[55],b[56],b[57],b[58],b[59],b[60],b[61],b[62],b[63], b[64],b[65],b[66],b[67],b[68],b[69],b[70],b[71],b[72],b[73],b[74],b[75],b[76],b[77],b[78],b[79] );
+	uint32_t *b32 = (uint32_t *)b;
+
+	// Send Block Header data to FPGA
+	// Break Block Header into 32bit chunks and pass to pci register addresses offset by 4 bytes each time
+	for (i = 0; i < 20; i++) {
+		addr += 4;
+//		rc = fpga_pci_poke(pci_bar_handle, addr, b32[i]);
+		rc = fpga_pci_poke(pci_bar_handle, addr, swab32(b32[i]));
+	}
+
+	printf("Block Header sent to FPGA.\n");
+
+	sleep(1);
+
+	// Check for result returned from FPGA
+	addr = UINT64_C(0x554);
+	value = 0x11111111;
+	rc = fpga_pci_peek(pci_bar_handle, addr, &value);
+	printf("FPGA returned 0x%x from address 0x%x\n", value, addr);
+
+	// Send empty value to address 0x530 to trigger FPGA to send back a result...this is just a dummy test to show connectivity
+	printf("Running connectivity test\n");
+	addr = UINT64_C(0x558);
+	value = 0x22222222;
+	rc = fpga_pci_poke(pci_bar_handle, addr, value);
+
+	// Display value returned from FPGA
+	rc = fpga_pci_peek(pci_bar_handle, addr, &value);
+	printf("FPGA returned 0x%x from address 0x%x\n", value, addr);
+
+	// Send Block Header data to FPGA
+	// Break Block Header into 32bit chunks and pass to pci register addresses offset by 4 bytes each time
+//	printf("\nDumping Block Header stored in FPGA...\n\n");
+//	addr = UINT64_C(0x000);
+//	value = 0x33333333;
+//	for (i = 0; i < 20; i++) {
+//		rc = fpga_pci_peek(pci_bar_handle, addr, &value);
+//		printf("FPGA returned 0x%x from address 0x%x\n", value, addr);
+//		addr += 4;
+//	}
+
+	printf("\nDone.\n");
+
+	exit(0);
+	
+}
+
+int check_afi_ready(int slot_id) {
+    struct fpga_mgmt_image_info info = {0}; 
+    int rc;
+
+    rc = fpga_mgmt_describe_local_image(slot_id, &info,0);
+    fail_on(rc, out, "Unable to get AFI information from slot %d. Are you running as root?",slot_id);
+
+    if (info.status != FPGA_STATUS_LOADED) {
+        rc = 1;
+        fail_on(rc, out, "AFI in Slot %d is not in READY state !", slot_id);
+    }
+
+    printf("AFI PCI  Vendor ID: 0x%x, Device ID 0x%x\n",
+        info.spec.map[FPGA_APP_PF].vendor_id,
+        info.spec.map[FPGA_APP_PF].device_id);
+
+    if (info.spec.map[FPGA_APP_PF].vendor_id != pci_vendor_id ||
+        info.spec.map[FPGA_APP_PF].device_id != pci_device_id) {
+        printf("AFI does not show expected PCI vendor id and device ID. If the AFI "
+               "was just loaded, it might need a rescan. Rescanning now.\n");
+
+        rc = fpga_pci_rescan_slot_app_pfs(slot_id);
+        fail_on(rc, out, "Unable to update PF for slot %d",slot_id);
+        rc = fpga_mgmt_describe_local_image(slot_id, &info,0);
+        fail_on(rc, out, "Unable to get AFI information from slot %d",slot_id);
+
+        printf("AFI PCI  Vendor ID: 0x%x, Device ID 0x%x\n",
+            info.spec.map[FPGA_APP_PF].vendor_id,
+            info.spec.map[FPGA_APP_PF].device_id);
+
+        if (info.spec.map[FPGA_APP_PF].vendor_id != pci_vendor_id ||
+             info.spec.map[FPGA_APP_PF].device_id != pci_device_id) {
+            rc = 1;
+            fail_on(rc, out, "The PCI vendor id and device of the loaded AFI are not "
+                             "the expected values.");
+        }
+    }
+    
+    return rc;
+
+out:
+    return 1;
+}
+
+
+
+
 
 #define LP_SCANTIME		60
 
@@ -2582,6 +2702,8 @@ static bool initialize_serial_miner(void *thr, int serial_fpga_num)
 	fpga->Hs = 0.000001;	// Default Hs(hashes/sec) to 1MH/s until share is found and hashrate can be calculated
 			
 	fpga->slot_id = serial_fpga_num;
+	fpga->pf_id = FPGA_APP_PF;
+	fpga->bar_id = APP_PF_BAR0;
 	
 	return true;
 }
@@ -2691,48 +2813,19 @@ static void *serial_miner_thread(void *userdata)
 	uint32_t *b32 = (uint32_t *)send_buf;
 	uint32_t value = 0x00000000;
 	uint32_t old_value = 0x00000000;
+	uint64_t addr = 0x500;
 
-	// Locate PCI device
-	pci_path[20] = 0;
-	DIR* dir = opendir(pci_path);
-	if (!dir) {
-		applog(LOG_ERR, "Unable to opendir %s", pci_path);
-		goto out;
-	}
-	pci_path[20] = '/';
-	memcpy(pci_path + 34, "config", 7);
-	struct dirent* entry;
-	bool found = false;
-	while (!found && (entry = readdir(dir)))
-	{
-		if (strlen(entry->d_name) != 12) continue;
-		memcpy(pci_path + 21, entry->d_name, 12);
-		int fd = open(pci_path, O_RDONLY);
-		if (fd < 0) continue;
-		struct
-		{
-			uint16_t vid;
-			uint16_t pid;
-		} devid;
-		if (read(fd, &devid, sizeof(devid)) == sizeof(devid) && devid.vid == pci_vendor_id && devid.pid == pci_device_id) found = true;
-		close(fd);
-	}
-	closedir(dir);
-	memcpy(pci_path + 34, "resourc", 7);
-	if (!found) {
-		applog(LOG_ERR, "Could not find PCI device with ID %04x:%04x", pci_vendor_id, pci_device_id);
-		goto out;
-	}
+	// Get PCI Bar Handle To The AWS FPGA
+	pci_bar_handle_t pci_bar_handle = PCI_BAR_HANDLE_INIT;
 
-	// Get access to PCI device
-	pci_fd = open(pci_path, O_RDWR);
-	if (pci_fd <= 0) {
-		applog(LOG_ERR, "Could not open PCI device %s", pci_path);
-		goto out;
-	}
-	pci_base = (volatile uint32_t*)mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, pci_fd, 0);
-	if (pci_base == MAP_FAILED) {
-		applog(LOG_ERR, "Could not mmap PCI device %s", pci_path);
+	// attach to the fpga, with a pci_bar_handle out param
+	// To attach to multiple slots or BARs, call this function multiple times,
+	// saving the pci_bar_handle to specify which address space to interact with in
+	// other API calls.
+	// This function accepts the slot_id, physical function, and bar number
+	rc = fpga_pci_attach(fpga->slot_id, fpga->pf_id, fpga->bar_id, 0, &pci_bar_handle);
+	if (rc) {
+		applog(LOG_ERR, "Unable to attache to AWS FPGA on slot %s", fpga->slot_id);
 		goto out;
 	}
 
@@ -2815,8 +2908,25 @@ static void *serial_miner_thread(void *userdata)
 
 		// Send Data To FPGA
 		// Break Block Header into 32bit chunks and pass to pci register addresses offset by 4 bytes each time
-		for (i = 0; i < 20; i++) pci_base[0x01 + i] = swab32(b32[i]);
+		addr = UINT64_C(0x504);
+		for (i = 0; i < 20; i++) {
+//			rc = fpga_pci_poke(pci_bar_handle, addr, b32[i]);
+//			rc = fpga_pci_poke(pci_bar_handle, addr, swab32(z32[i]));
+			rc = fpga_pci_poke(pci_bar_handle, addr, swab32(b32[i]));
+//			rc = fpga_pci_poke(pci_bar_handle, addr, 00000000);
+			addr += 4;
+		}
 
+
+
+// addr = UINT64_C(0x000);
+// value = 0x33333333;
+// for (i = 0; i < 20; i++) {                
+//  rc = fpga_pci_peek(pci_bar_handle, addr, &value);      
+//  printf("FPGA returned 0x%x from address 0x%x\n", value, addr);      
+//  addr += 4;
+// }
+		
 		hashes_done = 0;
 		elapsed.tv_sec = 0;
 		elapsed.tv_usec = 0;
@@ -2827,15 +2937,26 @@ static void *serial_miner_thread(void *userdata)
 
 			memset(nonce_buf,0,4);
 		
+			// Check Serial Port For 1/10 Sec For Nonce  
+//			ret = read(fd, nonce_buf, SERIAL_READ_SIZE);
+
+			addr = UINT64_C(0x554);
 			for (i = 0; i < 10; i++) {
-				value = pci_base[0x16];
+				rc = fpga_pci_peek(pci_bar_handle, addr, &value);
+//				value = swab32(value);
+//				value = value - 0x1B337BE;
+				if (rc) {
+					applog(LOG_ERR, "%s: Read error on AWS FPGA slot %d", fpga->short_name, fpga->slot_id);
+					continue;
+				}
 				
 				if ((value != 0) && (value != old_value)) {
 					nonce = value;
 					old_value = value;
 					ret = 1;
-					//pci_base[0x14] = value;
-					//value = pci_base[0x14];
+					addr = UINT64_C(0x050);
+					rc = fpga_pci_poke(pci_bar_handle, addr, value);
+					rc = fpga_pci_peek(pci_bar_handle, addr, &value);
 //					printf("FPGA returned 0x%x from address 0x%x\n", value, addr);
 					break;
 				}
@@ -2919,8 +3040,6 @@ static void *serial_miner_thread(void *userdata)
 	}
 
 out:
-	if (pci_fd >= 0) close(pci_fd);
-	pci_fd = -1;
 	tq_freeze(mythr->q);
 	
 	pthread_mutex_lock(&stats_lock);
@@ -3402,6 +3521,23 @@ int main(int argc, char *argv[]) {
 //	g_fpga_count = 1;
 	g_serial_fpga_count = opt_n_threads;
 	g_fpga_count = opt_n_threads;
+	
+	applog(LOG_DEBUG, "Initializing AWS FGPA");
+	rc = fpga_pci_init();
+	if (rc) {
+		applog(LOG_ERR, "Unable to initialize AWS FGPA");
+		return 1;
+	}
+	
+	for (i = 0; i < g_serial_fpga_count; i++) {
+		applog(LOG_DEBUG, "Checking AWS FGPA on slot %d", i);
+		rc = check_afi_ready(i);
+		if (rc) {
+			applog(LOG_ERR, "AWS FGPA on slot %d is not ready", i);
+			return 1;
+		}
+	}
+
 	g_miner_count += g_fpga_count;
 
 	switch (opt_algo) {
