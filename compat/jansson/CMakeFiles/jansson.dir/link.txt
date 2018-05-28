@@ -1,0 +1,2 @@
+/bin/ar cr libjansson.a  CMakeFiles/jansson.dir/dump.c.o CMakeFiles/jansson.dir/hashtable.c.o CMakeFiles/jansson.dir/load.c.o CMakeFiles/jansson.dir/strbuffer.c.o CMakeFiles/jansson.dir/utf.c.o CMakeFiles/jansson.dir/value.c.o
+/bin/ranlib libjansson.a
